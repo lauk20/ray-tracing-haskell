@@ -43,9 +43,21 @@ viewportUpperLeft = cameraCenter .- (MkVec3 0 0 focalLength) .- (viewportU ./ 2)
 pixel00Loc :: Vec3
 pixel00Loc = viewportUpperLeft .+ ((pixelDeltaU .+ pixelDeltaV) .* 0.5)
 
+-- Determine whether a sphere is hit
+hitSphere :: Vec3 -> Double -> Ray -> Bool
+hitSphere center radius r = 
+    let oc = center .- origin r
+        a = dot (direction r) (direction r)
+        b = (-2.0) * dot (direction r) oc
+        c = dot (oc) (oc) - (radius * radius)
+        discriminant = b * b - (4 * a * c)
+    in discriminant >= 0
+
 -- Get Color of ray sent into scene
 rayColor :: Ray -> Color
-rayColor ray = (MkVec3 1.0 1.0 1.0 .* (1.0 - a)) .+ (MkVec3 0.5 0.7 1.0 .* a)
+rayColor ray
+    | hitSphere (MkVec3 0 0 (-1)) 0.5 ray = MkVec3 1 0 0
+    | otherwise = (MkVec3 1.0 1.0 1.0 .* (1.0 - a)) .+ (MkVec3 0.5 0.7 1.0 .* a)
     where unitDirection = unitVector $ direction ray
           a = (y unitDirection + 1.0) * 0.5
 
