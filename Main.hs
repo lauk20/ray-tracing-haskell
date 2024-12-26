@@ -44,22 +44,26 @@ pixel00Loc :: Vec3
 pixel00Loc = viewportUpperLeft .+ ((pixelDeltaU .+ pixelDeltaV) .* 0.5)
 
 -- Determine whether a sphere is hit
-hitSphere :: Vec3 -> Double -> Ray -> Bool
+hitSphere :: Vec3 -> Double -> Ray -> Double
 hitSphere center radius r = 
     let oc = center .- origin r
-        a = dot (direction r) (direction r)
-        b = (-2.0) * dot (direction r) oc
-        c = dot (oc) (oc) - (radius * radius)
-        discriminant = b * b - (4 * a * c)
-    in discriminant >= 0
+        a = lengthSquared $ direction r
+        h = dot (direction r) oc
+        c = lengthSquared oc - radius * radius
+        discriminant = h * h - a * c
+    in case discriminant < 0 of
+        True -> -1.0
+        _ -> (h - sqrt discriminant) / a
 
 -- Get Color of ray sent into scene
 rayColor :: Ray -> Color
 rayColor ray
-    | hitSphere (MkVec3 0 0 (-1)) 0.5 ray = MkVec3 1 0 0
+    | t > 0.0 = let n = unitVector $ at ray t .- MkVec3 0 0 (-1)
+                in MkVec3 (x n + 1) (y n + 1) (z n + 1) .* 0.5
     | otherwise = (MkVec3 1.0 1.0 1.0 .* (1.0 - a)) .+ (MkVec3 0.5 0.7 1.0 .* a)
     where unitDirection = unitVector $ direction ray
           a = (y unitDirection + 1.0) * 0.5
+          t = hitSphere (MkVec3 0 0 (-1)) 0.5 ray
 
 -- Generate the RGB raster
 generateRGB :: [[Vec3]]
