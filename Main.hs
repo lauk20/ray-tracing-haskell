@@ -1,7 +1,9 @@
 module Main where
 import Color
+import Hittable
 import PlainString
 import Ray
+import Sphere
 import Vector
 import Vec3
 
@@ -55,15 +57,22 @@ hitSphere center radius r =
         True -> -1.0
         _ -> (h - sqrt discriminant) / a
 
+-- World of objects
+world = HittableList [
+        HittableObj (Sphere (MkVec3 0 0 (-1)) 0.5),
+        HittableObj (Sphere (MkVec3 0 (-100.5) (-1)) 100)
+    ]
+
 -- Get Color of ray sent into scene
-rayColor :: Ray -> Color
-rayColor ray
-    | t > 0.0 = let n = unitVector $ at ray t .- MkVec3 0 0 (-1)
-                in MkVec3 (x n + 1) (y n + 1) (z n + 1) .* 0.5
-    | otherwise = (MkVec3 1.0 1.0 1.0 .* (1.0 - a)) .+ (MkVec3 0.5 0.7 1.0 .* a)
-    where unitDirection = unitVector $ direction ray
-          a = (y unitDirection + 1.0) * 0.5
-          t = hitSphere (MkVec3 0 0 (-1)) 0.5 ray
+rayColor :: Ray -> HittableList -> Color
+rayColor ray world =
+    case hitSomething of
+        Just hitRecord -> normal hitRecord .+ MkVec3 1 1 1 .* 0.5
+        Nothing -> (MkVec3 1.0 1.0 1.0 .* (1.0 - a)) .+ (MkVec3 0.5 0.7 1.0 .* a)
+    where 
+        unitDirection = unitVector $ direction ray
+        a = (y unitDirection + 1.0) * 0.5
+        hitSomething = hit world ray 0 (1 / 0) Nothing
 
 -- Generate the RGB raster
 generateRGB :: [[Vec3]]
@@ -71,7 +80,7 @@ generateRGB =
     [ [ let pixelCenter = pixel00Loc .+ (pixelDeltaU .* fromIntegral i) .+ (pixelDeltaV .* fromIntegral j)
             rayDirection = pixelCenter .- cameraCenter
             r = Ray cameraCenter rayDirection
-        in rayColor r
+        in rayColor r world
     | i <- [0..imageWidth - 1] ]
     | j <- [0..imageHeight - 1] ]
 
