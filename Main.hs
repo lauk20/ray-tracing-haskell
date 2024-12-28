@@ -4,8 +4,10 @@ import Hittable
 import PlainString
 import Ray
 import Sphere
+import Utils
 import Vector
 import Vec3
+import System.Random (random, mkStdGen, RandomGen, StdGen)
 
 -- Aspect Ratio
 aspectRatio :: Double
@@ -16,6 +18,12 @@ imageWidth :: Int
 imageWidth = 400
 imageHeight :: Int
 imageHeight = floor $ fromIntegral imageWidth / aspectRatio
+
+-- Samples Per Pixel
+samplesPerPixel :: Int
+samplesPerPixel = 100
+pixelSamplesScale :: Double
+pixelSamplesScale = 1.0 / fromIntegral samplesPerPixel
 
 -- Camera
 focalLength :: Double
@@ -45,17 +53,22 @@ viewportUpperLeft = cameraCenter .- (MkVec3 0 0 focalLength) .- (viewportU ./ 2)
 pixel00Loc :: Vec3
 pixel00Loc = viewportUpperLeft .+ ((pixelDeltaU .+ pixelDeltaV) .* 0.5)
 
--- Determine whether a sphere is hit
-hitSphere :: Vec3 -> Double -> Ray -> Double
-hitSphere center radius r = 
-    let oc = center .- origin r
-        a = lengthSquared $ direction r
-        h = dot (direction r) oc
-        c = lengthSquared oc - radius * radius
-        discriminant = h * h - a * c
-    in case discriminant < 0 of
-        True -> -1.0
-        _ -> (h - sqrt discriminant) / a
+-- Random Generator
+gen :: StdGen
+gen = mkStdGen 42
+
+-- No Longer Being Used
+-- -- Determine whether a sphere is hit
+-- hitSphere :: Vec3 -> Double -> Ray -> Double
+-- hitSphere center radius r = 
+--     let oc = center .- origin r
+--         a = lengthSquared $ direction r
+--         h = dot (direction r) oc
+--         c = lengthSquared oc - radius * radius
+--         discriminant = h * h - a * c
+--     in case discriminant < 0 of
+--         True -> -1.0
+--         _ -> (h - sqrt discriminant) / a
 
 -- World of objects
 world = HittableList [
@@ -74,16 +87,41 @@ rayColor ray world =
         a = (y unitDirection + 1.0) * 0.5
         hitSomething = hit world ray 0 (1 / 0) Nothing
 
+-- Construct a camera ray originating from the origin and directed at randomly sampled
+-- point around the pixel location i, j.
+getRay :: Int -> Int -> StdGen -> (Ray, StdGen)
+getRay i j gen =
+    let 
+        (offset, gen1) = sampleSquare gen
+        pixelSample = pixel00Loc
+                .+ (pixelDeltaU .* (fromIntegral i + x offset))
+                .+ (pixelDeltaV .* (fromIntegral j + y offset))
+        rayOrigin = cameraCenter
+        rayDirection = pixelSample .- rayOrigin
+    in (Ray rayOrigin rayDirection, gen1)
+
+-- Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
+sampleSquare :: StdGen -> (Vec3, StdGen)
+sampleSquare gen =
+    let (randX, gen1) = randomDouble gen
+        (randY, gen2) = randomDouble gen1
+    in (MkVec3 (randX - 0.5) (randY - 0.5) 0, gen2)
+
 -- Generate the RGB raster
 generateRGB :: [[Vec3]]
 generateRGB = 
-    [ [ let pixelCenter = pixel00Loc .+ (pixelDeltaU .* fromIntegral i) .+ (pixelDeltaV .* fromIntegral j)
-            rayDirection = pixelCenter .- cameraCenter
-            r = Ray cameraCenter rayDirection
-        in rayColor r world
-    | i <- [0..imageWidth - 1] ]
-    | j <- [0..imageHeight - 1] ]
-
+    [ [ (getMultipleSamples i j (MkVec3 0 0 0) gen) .* pixelSamplesScale
+        | i <- [0..imageWidth - 1] ]
+        | j <- [0..imageHeight - 1] ]
+    where
+        getMultipleSamples :: Int -> Int -> Color -> StdGen -> Color
+        getMultipleSamples i j pixelColor gen = helper i j pixelColor samplesPerPixel gen
+            where 
+                helper :: Int -> Int -> Color -> Int -> StdGen -> Color
+                helper i j pixelColor 0 gen = pixelColor
+                helper i j pixelColor iterations gen = helper i j (pixelColor .+ rayColor r world) (iterations - 1) gen'
+                    where (r, gen') = getRay i j gen
+            
 -- Main
 main :: IO ()
 main = do
