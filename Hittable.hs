@@ -1,16 +1,14 @@
 {-# LANGUAGE ExistentialQuantification #-}
 module Hittable where
 import Ray
+import Types
 import Vector
 import Vec3
-
--- HitRecord
-data HitRecord = HitRecord {p :: Vec3, normal :: Vec3, t :: Double, frontFace :: Bool}
 
 -- get the normal of a surface (outward normals convention)
 -- returns the new HitRecord
 getFaceNormal :: HitRecord -> Ray -> Vec3 -> HitRecord
-getFaceNormal record r outwardNormal = HitRecord point newnormal (t record) frontFace
+getFaceNormal record r outwardNormal = HitRecord point newnormal (t record) frontFace (mat record)
     where point = p record
           norm = normal record
           frontFace = (dot (direction r) outwardNormal) < 0
