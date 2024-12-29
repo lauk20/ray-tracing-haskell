@@ -57,3 +57,12 @@ randomOnHemisphere normal gen =
     in case dot onUnitSphere normal > 0.0 of
         True -> (onUnitSphere, g1)
         False -> (onUnitSphere .* (-1), g1)
+
+-- Whether a vector is basically the zero vector
+nearZero :: Vec3 -> Bool
+nearZero (MkVec3 x y z) = (abs x < s) && (abs y < s) && (abs z < s)
+    where s = 1e-8
+
+-- get reflected vector
+reflectVector :: Vec3 -> Vec3 -> Vec3
+reflectVector v n = v .- (n .* (dot v n * 2))

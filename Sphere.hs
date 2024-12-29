@@ -1,11 +1,13 @@
 module Sphere where
 import Hittable
+import Material
 import Ray
+import Types
 import Vec3
 import Vector
 
 -- Sphere data type
-data Sphere = Sphere {center :: Vec3, radius :: Double}
+data Sphere = Sphere {center :: Vec3, radius :: Double, matrl :: MaterialWrapper}
 
 -- Sphere instance of hittable
 instance Hittable Sphere where
@@ -25,7 +27,7 @@ instance Hittable Sphere where
                     troot = root
                     pos = at ray troot
                     outwardNormal = (pos .- ctr) ./ r
-                    newRecord = HitRecord pos outwardNormal troot False
+                    newRecord = HitRecord pos outwardNormal troot False (matrl sphere)
                     finalRecord = getFaceNormal newRecord ray outwardNormal
                 in case hitRecord of
                     Nothing -> Just finalRecord

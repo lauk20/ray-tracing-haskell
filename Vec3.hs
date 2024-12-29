@@ -23,6 +23,10 @@ instance Vector Vec3 where
     (./) :: Vec3 -> Double -> Vec3
     (MkVec3 x1 y1 z1) ./ num = MkVec3 (x1 / num) (y1 / num) (z1 / num)
 
+    -- Multiply Vec3 by Vec3
+    (*/*) :: Vec3 -> Vec3 -> Vec3
+    (MkVec3 x1 y1 z1) */* (MkVec3 x2 y2 z2) = MkVec3 (x1 * x2) (y1 * y2) (z1 * z2)
+
     -- Dot Product
     dot :: Vec3 -> Vec3 -> Double
     dot (MkVec3 x1 y1 z1) (MkVec3 x2 y2 z2) = x1 * x2 + y1 * y2 + z1 * z2

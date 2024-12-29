@@ -2,9 +2,11 @@ module Main where
 import Color
 import Data.List (foldl')
 import Hittable
+import Material
 import PlainString
 import Ray
 import Sphere
+import Types
 import Utils
 import Vector
 import Vec3
@@ -75,10 +77,22 @@ gen = mkStdGen 42
 --         True -> -1.0
 --         _ -> (h - sqrt discriminant) / a
 
+-- Materials
+materialGround :: MaterialWrapper
+materialCenter :: MaterialWrapper
+materialLeft :: MaterialWrapper
+materialRight :: MaterialWrapper
+materialGround = MaterialWrapper (Lambertian (MkVec3 0.8 0.8 0.0))
+materialCenter = MaterialWrapper (Lambertian (MkVec3 0.1 0.2 0.5))
+materialLeft = MaterialWrapper (Metal (MkVec3 0.8 0.8 0.8))
+materialRight = MaterialWrapper (Metal (MkVec3 0.8 0.6 0.2))
+
 -- World of objects
 world = HittableList [
-            HittableObj (Sphere (MkVec3 0 0 (-1)) 0.5),
-            HittableObj (Sphere (MkVec3 0 (-100.5) (-1)) 100)
+            HittableObj (Sphere (MkVec3 0 (-100.5) (-1)) 100 materialGround),
+            HittableObj (Sphere (MkVec3 0 0 (-1.2)) 0.5 materialCenter),
+            HittableObj (Sphere (MkVec3 (-1.0) 0 (-1)) 0.5 materialLeft),
+            HittableObj (Sphere (MkVec3 1.0 0 (-1)) 0.5 materialRight)
         ]
 
 -- Get Color of ray sent into scene
@@ -88,8 +102,17 @@ rayColor ray world gen iters =
     then (MkVec3 0 0 0, gen)
     else
         case hitSomething of
-            Just hitRecord -> let (direction, g1) = randomOnHemisphere (normal hitRecord) gen
-                            in (fst (rayColor (Ray (p hitRecord) (direction .+ (normal hitRecord))) world g1 (iters - 1)) .* 0.5, g1)
+            Just hitRecord -> 
+                case mat hitRecord of
+                    MaterialWrapper mr ->
+                            let scattered = Ray (MkVec3 0 0 0) (MkVec3 0 0 0)
+                                attenuation = MkVec3 0 0 0
+                                sc = scatter mr ray hitRecord attenuation scattered gen
+                            in case sc of
+                                Just (newColor, newScattered, g1) -> 
+                                    let (clr, g2) = rayColor newScattered world g1 (iters - 1)
+                                    in (newColor */* clr, g2)
+                                Nothing -> (MkVec3 0 0 0, gen)
             Nothing -> ((MkVec3 1.0 1.0 1.0 .* (1.0 - a)) .+ (MkVec3 0.5 0.7 1.0 .* a), gen)
     where 
         unitDirection = unitVector $ direction ray
