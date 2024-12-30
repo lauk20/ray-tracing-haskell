@@ -24,7 +24,7 @@ imageHeight = floor $ fromIntegral imageWidth / aspectRatio
 
 -- Samples Per Pixel
 samplesPerPixel :: Int
-samplesPerPixel = 100
+samplesPerPixel = 10
 pixelSamplesScale :: Double
 pixelSamplesScale = 1.0 / fromIntegral samplesPerPixel
 
@@ -88,12 +88,49 @@ materialLeft = MaterialWrapper (Metal (MkVec3 0.8 0.8 0.8))
 materialRight = MaterialWrapper (Metal (MkVec3 0.8 0.6 0.2))
 
 -- World of objects
-world = HittableList [
-            HittableObj (Sphere (MkVec3 0 (-100.5) (-1)) 100 materialGround),
-            HittableObj (Sphere (MkVec3 0 0 (-1.2)) 0.5 materialCenter),
-            HittableObj (Sphere (MkVec3 (-1.0) 0 (-1)) 0.5 materialLeft),
-            HittableObj (Sphere (MkVec3 1.0 0 (-1)) 0.5 materialRight)
-        ]
+-- world = HittableList [
+--             HittableObj (Sphere (MkVec3 0 (-100.5) (-1)) 100 materialGround),
+--             HittableObj (Sphere (MkVec3 0 0 (-1.2)) 0.5 materialCenter),
+--             HittableObj (Sphere (MkVec3 (-1.0) 0 (-1)) 0.5 materialLeft),
+--             HittableObj (Sphere (MkVec3 1.0 0 (-1)) 0.5 materialRight)
+--         ]
+
+-- Create random world
+createWorld :: (RandomGen g) => g -> HittableList -> (HittableList, g)
+createWorld gen list =
+    let
+        createDiffuse :: (RandomGen g) => (HittableList, g) -> Vec3 -> (HittableList, g)
+        createDiffuse (curr, gen) center =
+            let
+                (rand1, g1) = randomVec3 gen
+                (rand2, g2) = randomVec3 g1
+                albedo = rand1 */* rand2
+                sphereMaterial = MaterialWrapper (Lambertian albedo)
+                sphere = HittableObj (Sphere center 0.2 sphereMaterial)
+            in (HittableList (sphere : (objects curr)), g2)
+        
+        createMetal :: (RandomGen g) => (HittableList, g) -> Vec3 -> (HittableList, g)
+        createMetal (curr, g) center =
+            let
+                (rand1, g1) = randomVec3Range 0 0.5 g
+                albedo = rand1
+                sphereMaterial = MaterialWrapper (Metal albedo)
+                sphere = HittableObj (Sphere center 0.2 sphereMaterial)
+            in (HittableList (sphere : (objects curr)), g1)
+        
+        createObj :: (RandomGen g) => Int -> Int -> (HittableList, g) -> (HittableList, g)
+        createObj a b (curr, gen) =
+            let
+                (chooseMat, g1) = randomDouble gen
+                (rand1, g2) = randomDouble g1
+                (rand2, g3) = randomDouble g2
+                center = MkVec3 (fromIntegral a + 0.9 * rand1) 0.2 (fromIntegral b + 0.9 * rand2)
+            in case sqrt (lengthSquared (center .- MkVec3 4 0.2 0)) > 0.9 of
+                True -> case chooseMat of
+                            chooseMat | chooseMat < 0.8 -> createDiffuse (curr, g3) center
+                            chooseMat | chooseMat < 1 -> createMetal (curr, g3) center
+                False -> (curr, g3)
+    in foldl (\(world, g) a -> foldl (\(world', g') b -> createObj a b (world', g')) (world, g) [-11..10]) (list, gen) [-11..10]
 
 -- Get Color of ray sent into scene
 rayColor :: (RandomGen g) => Ray -> HittableList -> g -> Int -> (Color, g)
@@ -164,15 +201,18 @@ generateRGB gen =
                 accumSamples (accColor, gen) _ =
                     let 
                         (ray, gen1) = getRay i j gen
-                        (sampleColor, gen2) = rayColor ray world gen1 maxDepth
+                        (sampleColor, gen2) = rayColor ray randomWorld gen1 maxDepth
                     in (accColor .+ sampleColor, gen2)
- 
+
+(worldList, ngen) = createWorld gen (HittableList [])
+randomWorld = HittableList $ (HittableObj (Sphere (MkVec3 0 (-1000) 0) 1000 materialGround)) : (objects worldList)
 -- Main
 main :: IO ()
 main = do
     -- Render
     -- PPM Header
     print $ PlainString ("P3\n" ++ show imageWidth ++ " " ++ show imageHeight ++ "\n255")
+
 
     -- Print RGB Raster
     mapM_ (mapM_ writeColor) $ generateRGB gen
