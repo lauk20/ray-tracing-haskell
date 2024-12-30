@@ -1,4 +1,7 @@
 # ray-tracing-haskell
 
-Final Render (50 Samples Per Pixel)
 ![render](image.png)
+
+<p  align="center">
+	<em>Final Render (50 Samples Per Pixel)</em>
+</p>
