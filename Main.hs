@@ -11,6 +11,7 @@ import Utils
 import Vector
 import Vec3
 import System.Random (random, mkStdGen, RandomGen, StdGen)
+import Prelude hiding (length)
 
 -- Aspect Ratio
 aspectRatio :: Double
@@ -24,7 +25,7 @@ imageHeight = floor $ fromIntegral imageWidth / aspectRatio
 
 -- Samples Per Pixel
 samplesPerPixel :: Int
-samplesPerPixel = 10
+samplesPerPixel = 50
 pixelSamplesScale :: Double
 pixelSamplesScale = 1.0 / fromIntegral samplesPerPixel
 
@@ -32,21 +33,45 @@ pixelSamplesScale = 1.0 / fromIntegral samplesPerPixel
 maxDepth :: Int
 maxDepth = 10
 
+-- FOV
+vfov :: Double
+vfov = 20
+
+-- Position and Direction of Camera
+lookFrom :: Vec3
+lookAt :: Vec3
+vup :: Vec3
+lookFrom = MkVec3 13 2 3
+lookAt = MkVec3 0 0 0
+vup = MkVec3 0 1 0
+
 -- Camera
 focalLength :: Double
-focalLength = 1.0
+theta :: Double
+h :: Double
 viewportHeight :: Double
-viewportHeight = 2.0
 viewportWidth :: Double
-viewportWidth = viewportHeight * (fromIntegral imageWidth / fromIntegral imageHeight)
 cameraCenter :: Vec3
-cameraCenter = MkVec3 0 0 0
+focalLength = length (lookFrom .- lookAt)
+theta = degreesToRadians vfov
+h = tan $ theta / 2
+viewportHeight = 2.0 * h * focalLength
+viewportWidth = viewportHeight * (fromIntegral imageWidth / fromIntegral imageHeight)
+cameraCenter = lookFrom
+
+-- Basis Vectors
+u :: Vec3
+v :: Vec3
+w :: Vec3
+w = unitVector (lookFrom .- lookAt)
+u = unitVector $ cross vup w
+v = cross w u
 
 -- Vectors Across Horizontal and Vertical Viewport Edges
 viewportU :: Vec3
-viewportU = MkVec3 viewportWidth 0 0
+viewportU = u .* viewportWidth
 viewportV :: Vec3
-viewportV = MkVec3 0 (viewportHeight * (-1)) 0
+viewportV = v .* ((-1) * viewportHeight)
 
 -- Viewport deltas between pixels
 pixelDeltaU :: Vec3
@@ -56,7 +81,7 @@ pixelDeltaV = viewportV ./ fromIntegral imageHeight
 
 -- Location of upper left pixel
 viewportUpperLeft :: Vec3
-viewportUpperLeft = cameraCenter .- (MkVec3 0 0 focalLength) .- (viewportU ./ 2) .- (viewportV ./ 2)
+viewportUpperLeft = cameraCenter .- (w .* focalLength) .- (viewportU ./ 2) .- (viewportV ./ 2)
 pixel00Loc :: Vec3
 pixel00Loc = viewportUpperLeft .+ ((pixelDeltaU .+ pixelDeltaV) .* 0.5)
 
@@ -82,7 +107,7 @@ materialGround :: MaterialWrapper
 materialCenter :: MaterialWrapper
 materialLeft :: MaterialWrapper
 materialRight :: MaterialWrapper
-materialGround = MaterialWrapper (Lambertian (MkVec3 0.8 0.8 0.0))
+materialGround = MaterialWrapper (Lambertian (MkVec3 0.5 0.5 0.5))
 materialCenter = MaterialWrapper (Lambertian (MkVec3 0.1 0.2 0.5))
 materialLeft = MaterialWrapper (Metal (MkVec3 0.8 0.8 0.8))
 materialRight = MaterialWrapper (Metal (MkVec3 0.8 0.6 0.2))
@@ -204,15 +229,28 @@ generateRGB gen =
                         (sampleColor, gen2) = rayColor ray randomWorld gen1 maxDepth
                     in (accColor .+ sampleColor, gen2)
 
+-- Create Our World
 (worldList, ngen) = createWorld gen (HittableList [])
-randomWorld = HittableList $ (HittableObj (Sphere (MkVec3 0 (-1000) 0) 1000 materialGround)) : (objects worldList)
+
+material2 :: MaterialWrapper
+material3 :: MaterialWrapper
+material2 = MaterialWrapper (Lambertian (MkVec3 0.4 0.2 0.1))
+material3 = MaterialWrapper (Metal (MkVec3 0.7 0.6 0.5))
+
+mainObjs :: [HittableObj]
+mainObjs = [
+        HittableObj (Sphere (MkVec3 0 (-1000) 0) 1000 materialGround),
+        HittableObj (Sphere (MkVec3 (-4) 1 0) 1 material2),
+        HittableObj (Sphere (MkVec3 4 1 0) 1 material3)
+    ]
+randomWorld = HittableList $ mainObjs ++ (objects worldList)
+
 -- Main
 main :: IO ()
 main = do
     -- Render
     -- PPM Header
     print $ PlainString ("P3\n" ++ show imageWidth ++ " " ++ show imageHeight ++ "\n255")
-
 
     -- Print RGB Raster
     mapM_ (mapM_ writeColor) $ generateRGB gen
